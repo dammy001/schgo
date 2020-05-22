@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"html"
+	"log"
 	"strings"
 	"time"
 
@@ -49,7 +50,7 @@ func (u *User) Validate(action string) error {
 	switch strings.ToLower(action) {
 	case "update":
 		if u.Fullname == "" {
-			return errors.New("Required Username")
+			return errors.New("Required Fullname")
 		}
 		if u.Password == "" {
 			return errors.New("Required Password")
@@ -121,4 +122,39 @@ func (u *User) FindUser(db *gorm.DB, uid uint32) (*User, error) {
 		return &User{}, errors.New("User Not Found")
 	}
 	return u, err
+}
+
+func (u *User) UpdateUser(db *gorm.DB, uid uint32) (*User, error) {
+
+	err := u.BeforeSave()
+	if err != nil {
+		log.Fatal(err)
+	}
+	db = db.Debug().Model(&User{}).Where("id = ?", uid).Take(&User{}).UpdateColumns(
+		map[string]interface{}{
+			"password":  u.Password,
+			"fullname":  u.Fullname,
+			"email":     u.Email,
+			"update_at": time.Now(),
+		},
+	)
+	if db.Error != nil {
+		return &User{}, db.Error
+	}
+
+	err = db.Debug().Model(&User{}).Where("id = ?", uid).Take(&u).Error
+	if err != nil {
+		return &User{}, err
+	}
+	return u, nil
+}
+
+func (u *User) DeleteUser(db *gorm.DB, uid uint32) (int64, error) {
+
+	db = db.Debug().Model(&User{}).Where("id = ?", uid).Take(&User{}).Delete(&User{})
+
+	if db.Error != nil {
+		return 0, db.Error
+	}
+	return db.RowsAffected, nil
 }
